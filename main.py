@@ -85,8 +85,8 @@ class threadDeviceManager(threading.Thread):
 			rs485Lock.release()
 			devlistLock.release()
 			devdataLock.release()
-			input()
-			#time.sleep(10)
+			#input()
+			time.sleep(30)
 
 class threadMqttRun(threading.Thread):
 	def __init__(self):

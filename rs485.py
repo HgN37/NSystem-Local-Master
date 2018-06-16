@@ -11,17 +11,13 @@ class RS485():
 		self.ser.parity = serial.PARITY_EVEN
 		self.ser.port = port
 		self.fix = 0
-		self.led = LED(0)
 		try:
-			self.led.off()
 			self.ser.open()
 		except:
 			print("ERROR: Can't open port " + port)
 	def send(self, array):
-		self.led.on()
 		self.ser.write(bytearray(array))
 		self.ser.flush()
-		self.led.off()
 	def available(self):
 		return self.ser.in_waiting
 	def get(self):
@@ -139,14 +135,8 @@ class Modbus(RS485):
 def main():
 	print('Master - Slave Connection')
 	slave = Modbus('/dev/ttyUSB0')
-	slave.send_frame(0x00, 0x00, 0x30, 0x02, 0x0D, 0x01)
-	a = 0
 	while True:
-		slave.get()
-		b = slave.available()
-		if b != a:
-			a = b
-			print(a)
+		slave.send_frame(0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF)
 
 
 if __name__ == '__main__':
