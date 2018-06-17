@@ -134,7 +134,7 @@ class Modbus(RS485):
 
 def main():
 	print('Master - Slave Connection')
-	slave = Modbus('/dev/ttyUSB0')
+	slave = Modbus('/dev/serial0')
 	while True:
 		slave.send_frame(0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF)
 

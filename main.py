@@ -47,7 +47,6 @@ class threadDeviceManager(threading.Thread):
 				while(frame == 'ERROR' and timeout < 1):
 					frame = modbus.get_frame(2)
 					timeout = (datetime.datetime.now() - timeout_start).seconds
-				
 				if frame == 'ERROR':
 					print('  + Found a missing device at addr ', key)
 					dev2remove.append(key)
@@ -55,6 +54,22 @@ class threadDeviceManager(threading.Thread):
 				devlist.pop(dev, None)
 				devdata.pop(dev, None)
 			print('Done')
+			'''
+			print('Start scanning exist device')
+			for addr in range(32):
+				modbus.send_frame(addr,0x01,0x30,0x01)
+				time.sleep(0.1)
+				frame = modbus.get_frame(1)
+				if frame != 'ERROR':
+					print('    + Found existing device at addr ' + str(addr))
+					modbus.send_frame(addr,0x01,0xF1,0x02)
+					time.sleep(0.1)
+					frame = modbus.get_frame(2)
+					devlist[str(addr)] = {'HARDWARE':0,'ID':0}
+					devlist[str(addr)]['HARDWARE'] = frame['DATA'][0]
+					devlist[str(addr)]['ID'] = frame['DATA'][1]
+					devdata[str(addr)] = []
+			'''
 			print('Start scanning new device')
 			addr = 1
 			for rand in range(32):
@@ -85,8 +100,8 @@ class threadDeviceManager(threading.Thread):
 			rs485Lock.release()
 			devlistLock.release()
 			devdataLock.release()
-			#input()
-			time.sleep(30)
+			input()
+			#time.sleep(10)
 
 class threadMqttRun(threading.Thread):
 	def __init__(self):
@@ -188,8 +203,7 @@ class threadUpdateData(threading.Thread):
 					#mqtt.run()
 					#mqttLock.release()
 			devdataLock.release()
-			time.sleep(2)	
-			
+			time.sleep(5)
 
 class threadRule(threading.Thread):
 	def __init__(self):
