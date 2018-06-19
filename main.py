@@ -29,9 +29,9 @@ class threadDeviceManager(threading.Thread):
 	def run(self):
 		global devlist
 		while True:
-			rs485Lock.acquire(1)
-			devlistLock.acquire(1)
-			devdataLock.acquire(1)
+			#rs485Lock.acquire()
+			devlistLock.acquire()
+			devdataLock.acquire()
 			start_time = datetime.datetime.now()
 			print('Start scanning for lost device...')
 			dev2remove = []
@@ -79,7 +79,7 @@ class threadDeviceManager(threading.Thread):
 					addr = addr + 1
 				print('Scanning random num {} for addr {}'.format(rand, addr))
 				modbus.send_frame(0x00, 0x00, 0x30, 0x02, rand, addr)
-				time.sleep(0.01)
+				time.sleep(0.03)
 				frame = modbus.get_frame(2)
 				if frame == 'ERROR':
 					pass
@@ -97,11 +97,11 @@ class threadDeviceManager(threading.Thread):
 			print('Done')
 			end_time = datetime.datetime.now() - start_time
 			print('Scanning done in ', str(end_time))
-			rs485Lock.release()
+			#rs485Lock.release()
 			devlistLock.release()
 			devdataLock.release()
-			input()
-			#time.sleep(10)
+			#input()
+			time.sleep(10)
 
 class threadMqttRun(threading.Thread):
 	def __init__(self):
@@ -121,11 +121,13 @@ class threadMqttCommand(threading.Thread):
 		print('Try to connect to mqtt broker')
 		while True:
 			#mqtt.run()
-			try:
+			#try:
 				msg = ''
 				msg = mqtt.get()
 				if(msg != ''):
-					rs485Lock.acquire(1)
+					#print("Cmd get Lock")
+					rs485Lock.acquire()
+					#print("Cmd got it")
 					cmd = ast.literal_eval(msg)
 					if(cmd['ADDR'] != rasp_info.rasp_get_id()):
 						print('Wrong addr')
@@ -138,43 +140,53 @@ class threadMqttCommand(threading.Thread):
 							modbus.send_frame(int(cmd['DEV1']), 0x01, 0x10, 0x02)
 						elif(cmd['FUNC'] == 'RULE'):
 							print('GET RULE FUNC: \r\n' + str(cmd))
-							rulelistLock.acquire()
+							#rulelistLock.acquire()
+							#print("Get rule lock")
 							rulelist[cmd['DATA']['4']] = {'DEV1':'', 'DEV2':'', 'DATA':{'1':'', '2':'', '3':''}}
 							rulelist[cmd['DATA']['4']]['DEV1'] = cmd['DEV1']
 							rulelist[cmd['DATA']['4']]['DEV2'] = cmd['DEV2']
 							rulelist[cmd['DATA']['4']]['DATA']['1'] = cmd['DATA']['1']
 							rulelist[cmd['DATA']['4']]['DATA']['2'] = cmd['DATA']['2']
 							rulelist[cmd['DATA']['4']]['DATA']['3'] = cmd['DATA']['3']
-							rulelistLock.release()
+							#rulelistLock.release()
+							#print("Release rule lock")
 							#print(rulelist)
 						elif(cmd['FUNC'] == 'DELRULE'):
-							print('GET DELRULE FUNC: \r\n' + str(cmd))
-							rulelistLock.acquire()
-							rulelist.pop(cmd['DATA']['4'], None)
-							rulelistLock.release()
+							#print('GET DELRULE FUNC: \r\n' + str(cmd))
+							#rulelistLock.acquire()
+							#print('Get rulelistLock')
+							rulelist.pop(str(cmd['DATA']['4']), None)
+							#print(cmd['DATA']['4'])
+							#print(rulelist)
+							#rulelistLock.release()
+							#print('Release Rulelist Lock')
+							#print('Del rule done')
 					res = modbus.get_frame(2)
 					timeout_start = datetime.datetime.now()
 					timeout = (datetime.datetime.now() - timeout_start).seconds
+					print('Wait for respond')
 					while(res == 'ERROR' and timeout < 1):
 						res = modbus.get_frame(2)
 						timeout = (datetime.datetime.now() - timeout_start).seconds
+					print('Done Waiting')
 					if(res != 'ERROR'):
 						print(res)
 						res_data = str(res['DATA'][0] << 8 | res['DATA'][1])
-						#.acquire()
+						#mqttLock.acquire()
 						mqtt.send_frame(cmd['ADDR'], cmd['FUNC'], cmd['DEV1'], cmd['DEV2'], res_data, 'FF', 'FF', 'FF')
 						#mqtt.run()
 						#mqttLock.release()
 					rs485Lock.release()
-			except:
-				pass
+					print('Cmd release Lock')
+			#except:
+			#	pass
 				
 class threadUpdateData(threading.Thread):
 	def __init__(self):
 		threading.Thread.__init__(self)
 	def run(self):
 		while True:
-			mqtt.send_frame(rasp_info.rasp_get_id(), 'UPDATE', '0', 'FF', 'FF', 'FF', 'FF', 'FF')
+			#mqtt.send_frame(rasp_info.rasp_get_id(), 'UPDATE', '0', 'FF', 'FF', 'FF', 'FF', 'FF')
 			devdataLock.acquire()
 			print('Get data...')
 			for addr, value in devdata.items():
@@ -182,17 +194,21 @@ class threadUpdateData(threading.Thread):
 					continue
 				if addr == 'RASPID':
 					continue
+				time.sleep(0.2)
+				#print('Get RS485 Lock')
 				rs485Lock.acquire(1)
+				#print('Got it')
 				modbus.send_frame(int(addr), 0x01, 0x10, 0x02)
 				res = modbus.get_frame(2)
 				timeout_start = datetime.datetime.now()
 				timeout = (datetime.datetime.now() - timeout_start).seconds
-				while(res == 'ERROR' and timeout < 1):
+				while(res == 'ERROR' and timeout < 3):
 					res = modbus.get_frame(2)
 					timeout = (datetime.datetime.now() - timeout_start).seconds
 				rs485Lock.release()
+				#print('Release RS485 Lock')
 				if res != 'ERROR':
-					print(res)
+					#print(res)
 					data = res['DATA'][0] << 8 | res['DATA'][1]
 					print(data)
 					if(len(devdata) > 100):
@@ -203,7 +219,7 @@ class threadUpdateData(threading.Thread):
 					#mqtt.run()
 					#mqttLock.release()
 			devdataLock.release()
-			time.sleep(5)
+			time.sleep(2)
 
 class threadRule(threading.Thread):
 	def __init__(self):
@@ -224,6 +240,7 @@ class threadRule(threading.Thread):
 					if(int(rule['DEV2']) == 0x00):
 						now = datetime.datetime.now()
 						data = now.hour*60 + now.minute
+						print("Time: ", data)
 					else:
 						data = int(devdata[rule['DEV2']][-1])
 				except:
@@ -245,6 +262,7 @@ class threadRule(threading.Thread):
 				# Do rule if need
 				#print(devlist[rule['DEV1']]['LASTDATA'])
 				#print(rule['DATA']['1'])
+				#print(rule)
 				if condition == True and int(devdata[rule['DEV1']][-1]) != int(rule['DATA']['1']):
 					rs485Lock.acquire()
 					modbus.send_frame(int(rule['DEV1']), 0x02, 0x10, 0x02, (int(rule['DATA']['1'])&0xFF00)>>8, (int(rule['DATA']['1'])&0x00FF))		
@@ -263,7 +281,7 @@ class threadRule(threading.Thread):
 					print('Task Done ', key)
 			rulelistLock.release()
 			devdataLock.release()
-			#time.sleep(1)
+			time.sleep(1)
 
 class threadUpdateFile(threading.Thread):
 	def __init__(self):
@@ -279,14 +297,18 @@ class threadUpdateFile(threading.Thread):
 		while True:
 			#print('Check file')
 			devlistLock.acquire(1)
+			#print("Unlock Devlist")
 			rulelistLock.acquire(1)
+			#print("Unlock Rulelist")
 			devdataLock.acquire(1)
+			#print("Unlock Devdata")
 			if self.tempdevlist != str(devlist):
 				print('Update dev data')
 				self.tempdevlist = str(devlist)
 				f = open('./devlist.txt', 'w')
 				f.write(str(self.tempdevlist))
 				f.close()
+				rulelist = {'FILE':'RULELIST','RASPID':str(rasp_info.rasp_get_id())}
 				need_update = True
 			if self.temprulelist != str(rulelist):
 				print('Update rule list')
@@ -300,7 +322,7 @@ class threadUpdateFile(threading.Thread):
 				f = open('./devdata.txt', 'w')
 				f.write(str(devdata))
 				f.close()
-			if (datetime.datetime.now() - start_time).seconds > 60:
+			if (datetime.datetime.now() - start_time).seconds > 300:
 				start_time = datetime.datetime.now()
 				need_update = True
 			devlistLock.release()
@@ -311,11 +333,11 @@ class threadUpdateFile(threading.Thread):
 				for i in range(3):
 					try:
 						sock = socket.socket()
-						sock.connect(('cretatech.com', 33333))
+						sock.connect(('cretag.kbvision.tv', 33333))
 						sock.send(self.tempdevlist.encode('utf-8'))
 						sock.close()
 						sock = socket.socket()
-						sock.connect(('cretatech.com', 33333))
+						sock.connect(('cretag.kbvision.tv', 33333))
 						sock.send(self.temprulelist.encode('utf-8'))
 						sock.close()
 						need_update = False
@@ -327,7 +349,7 @@ class threadUpdateFile(threading.Thread):
 				if need_update is True:
 					print('ERROR CONNECT TO SOCKET SERVER')
 			time.sleep(1)
-
+'''
 try:
 	current_rule = open('./rulelist.txt', 'r')
 	content = current_rule.read()
@@ -335,7 +357,7 @@ try:
 	rulelist = ast.literal_eval(content)
 except:
 	pass
-
+'''
 thread1 = threadDeviceManager()
 thread2 = threadMqttCommand()
 thread3 = threadUpdateData()

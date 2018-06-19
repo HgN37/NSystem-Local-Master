@@ -1,1 +1,1 @@
-{'1': {'HARDWARE': 1, 'ID': 1}, 'FILE': 'DEVLIST', 'RASPID': '000000008a8c7394'}
+{'1': {'HARDWARE': 1, 'ID': 1}, '2': {'HARDWARE': 5, 'ID': 1}, 'FILE': 'DEVLIST', 'RASPID': '000000008a8c7394'}
